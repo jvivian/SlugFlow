@@ -9,7 +9,7 @@ jobTree
 
 import networkx as nx
 import matplotlib.pyplot as plt
-import random
+from itertools import chain
 
 def convert(G):
     """
@@ -26,9 +26,18 @@ def convert(G):
 
     source_nodes = [node for node in G.nodes() if not nx.ancestors(G,node)]
     if len(source_nodes) > 1:
-        G.add_edges_from([(G, node) for node in source_nodes])
+        G.add_edges_from([('S', node) for node in source_nodes])
 
+    ##################
+    # While there exists node with more than 1 parent:
+    #   If node's parents have only 1 parent each:
+
+    neighbors = list(chain.from_iterable([G.neighbors(node) for node in G.nodes()]))
+    seen = set()
+    multi_parents = set(x for x in neighbors if x in seen or seen.add(x))
     
+
+
 
     return G
 
@@ -47,7 +56,7 @@ def main():
     plt.subplot(122)
     plt.title('End')
     nx.draw_circular(G)
-    plt.show()
+    #plt.show()
 
     # http://stackoverflow.com/questions/20133479/how-to-draw-directed-graphs-using-networkx-in-python
 
