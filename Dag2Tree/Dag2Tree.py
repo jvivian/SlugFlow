@@ -72,7 +72,7 @@ def convert(G):
                 print 'node: {}, parents: {}, mrca: {}, Y: {}'.format(node, parents, mrca, Y)
 
                 # Create a child of Y, Z (pseudo-node)
-                assert not G.has_node('Z{}'.format(pseudonode_count))
+                assert not G.has_node('Z{}'.format(pseudonode_count)), "Z{int} is a reserved naming scheme for nodes."
                 G.add_edge(Y, 'Z{}'.format(pseudonode_count),type='child')
                 nx.set_node_attributes(G,'Z{}'.format(pseudonode_count),'pseudonode')
 
@@ -100,10 +100,10 @@ def convert(G):
     #########################################################################
     # III. Collapse redundant pseudonodes                                   #
     #                                                                       #
+    # If a pseudnode has only one follow-on and no children:                #
+    #   Collapse pseudonode into parent, convert follow-on to child edge.   #                                                                   #
     # If a pseudnode has a parent whose only child is the pn:               #
     #    Collapse pseudonode into parent, retaining edge type.              #
-    # If a pseudnode has only one follow-on and no children:                #
-    #   Collapse pseudonode into parent, convert follow-on to child edge.   #
     #########################################################################
 
     pseudonodes = [node for node in G.nodes() if nx.get_node_attributes(G,node)]
@@ -115,12 +115,9 @@ def convert(G):
                 # Collapse pseudonode into parent as a child edge
                 G.add_edge( G.predecessors(pn)[0], list(nx.descendants(G, pn))[0], type='child')
                 G.remove_node(pn)
-                # This step takes precedence over other collapse step
-                # Since the node is removed, break the 'for' loop
-                break
 
         # If a parent of a pseudonode has only one descendent
-        if len(G.neighbors(G.predecessors(pn)[0])) == 1:
+        elif len(G.neighbors(G.predecessors(pn)[0])) == 1:
             # If that descendent is a child edge
             if G.get_edge_data(G.predecessors(pn)[0], pn)['type'] == 'child':
                 # Transfer all edges from pseudonode's descendents to parent.
