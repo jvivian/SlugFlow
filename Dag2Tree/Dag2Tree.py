@@ -109,9 +109,9 @@ def convert(G):
     pseudonodes = [node for node in G.nodes() if nx.get_node_attributes(G,node)]
     for pn in pseudonodes:
 
-        if len(nx.descendants(G, pn)) == 1:
+        if len(G.neighbors(pn)) == 1:
             # If pseudonodes only child is a follow-on
-            if G.get_edge_data(pn, list(nx.descendants(G, pn))[0])['type'] == 'follow-on':
+            if G.get_edge_data(pn, G.neighbors(pn)[0])['type'] == 'follow-on':
                 # Collapse pseudonode into parent as a child edge
                 G.add_edge( G.predecessors(pn)[0], list(nx.descendants(G, pn))[0], type='child')
                 G.remove_node(pn)
