@@ -97,24 +97,46 @@ def convert(G):
 
     assert nx.is_tree(G), 'convert function failed to convert DAG to tree'
 
-    #############################################################################################
-    # III. Collapse redundant pseudonodes
-    #
-    # If there exists a pseudonode
-    #
-    #
-    #
-    #
-    #################################################
+    #########################################################################
+    # III. Collapse redundant pseudonodes                                   #
+    #                                                                       #
+    # If a pseudnode has a parent whose only child is the pn:               #
+    #    Collapse pseudonode into parent, retaining edge type.              #
+    # If a pseudnode has only one follow-on and no children:                #
+    #   Collapse pseudonode into parent, convert follow-on to child edge.   #
+    #########################################################################
+
+    pseudonodes = [node for node in G.nodes() if nx.get_node_attributes(G,node)]
+    for pn in pseudonodes:
+
+        if len(nx.descendants(G, pn)) == 1:
+            # If pseudonodes only child is a follow-on
+            if G.get_edge_data(pn, list(nx.descendants(G, pn))[0])['type'] == 'follow-on':
+                # Collapse pseudonode into parent as a child edge
+                G.add_edge( G.predecessors(pn)[0], list(nx.descendants(G, pn))[0], type='child')
+                G.remove_node(pn)
+                # This step takes precedence over other collapse step
+                # Since the node is removed, break the 'for' loop
+                break
+
+        # If a parent of a pseudonode has only one descendent
+        if len(G.neighbors(G.predecessors(pn)[0])) == 1:
+            # If that descendent is a child edge
+            if G.get_edge_data(G.predecessors(pn)[0], pn)['type'] == 'child':
+                # Transfer all edges from pseudonode's descendents to parent.
+                parent = G.predecessors(pn)[0]
+                for child in G.neighbors(pn):
+                    G.add_edge(parent, child, type=G.get_edge_data(pn, child)['type'] )
+                G.remove_node(pn)
 
     return G
 
 def if_follow_on(G, mrca):
     if any(x['type'] == 'follow-on' for x in [G.get_edge_data(mrca, x) for x in G.neighbors(mrca)]):
-        print 'mrca: {}, has a followon'.format(mrca)
+        print '\tmrca: {}, has a follow-on'.format(mrca)
         mrca_follow_on = [x for x in G.neighbors(mrca) if G.get_edge_data(mrca,x)['type'] == 'follow-on'][0]
         if not any(x['type'] == 'follow-on' for x in [G.get_edge_data(mrca_follow_on, x) for x in G.neighbors(mrca_follow_on)]):
-            print 'new mrca: {}'.format(mrca_follow_on)
+            print '\tnew mrca: {}'.format(mrca_follow_on)
             return mrca_follow_on
         else:
             if_follow_on(G, mrca_follow_on)
@@ -135,20 +157,18 @@ def main():
     convert(G)
 
     plt.subplot(122)
-    plt.title('End Tree (pre-collapse)')
+    plt.title('End Tree (post-collapse)')
     red_edges =  [edge for edge in G.edges() if G.get_edge_data(edge[0],edge[1])['type'] == 'follow-on']
     edge_colours = ['black' if not edge in red_edges else 'red' for edge in G.edges()]
     black_edges = [edge for edge in G.edges() if edge not in red_edges]
     node_labels = {node:node for node in G.nodes()};
-    pos = nx.spring_layout(G)
+    #pos = nx.spring_layout(G)
+    pos = nx.circular_layout(G)
     nx.draw_networkx_labels(G, pos, labels=node_labels)
     nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'))
     nx.draw_networkx_edges(G, pos, edgelist=red_edges, edge_color='r', arrows=True)
-    nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=False)
+    nx.draw_networkx_edges(G, pos, edgelist=black_edges, arrows=True)
     plt.show()
-    #plt.title('End')
-    #nx.draw_networkx(G)
-    #plt.show()
 
     # http://stackoverflow.com/questions/20133479/how-to-draw-directed-graphs-using-networkx-in-python
 
