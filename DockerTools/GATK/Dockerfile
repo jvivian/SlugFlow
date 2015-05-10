@@ -7,7 +7,7 @@ RUN apt-get install -y maven git
 
 # Obtain GATK Source
 WORKDIR /home
-RUN git clone https://github.com/broadgsa/gatk-protected/
+RUN git clone https://github.com/broadgsa/gatk-protected
 
 # Build GATK
 WORKDIR /home/gatk-protected

@@ -11,15 +11,15 @@ RUN mkdir mutect-src
 WORKDIR mutect-src
 
 # Get Mutect source
-RUN git clone git@github.com:broadinstitute/mutect.git
+RUN git clone https://github.com/broadinstitute/mutect
 
 # Get GATK source
-RUN git clone git@github.com:broadgsa/gatk-protected.git
+RUN git clone https://github.com/broadgsa/gatk-protected
 WORKDIR gatk-protected
 RUN git reset --hard 3.1
 
 # Build GATK
-mvn -Ddisable.queue install
+RUN mvn -Ddisable.queue install
 
 # Build MuTect
 WORKDIR /home/mutect-src/mutect
