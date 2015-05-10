@@ -125,36 +125,55 @@ class SupportClass(object):
 
         return None
 
-####    Begin Pipeline Targets    ####
-def acquire_docker(target, args, input_urls, symbolic_inputs):
+            ####    Begin Pipeline    ####
+def check_for_docker(target, args, input_urls, symbolic_inputs):
     """
-    Installs Docker if not present on the system.
+    Checks if Docker is present on system -- installs on linux if not present.
     """
     sclass = SupportClass(args, input_urls, symbolic_inputs)
 
     if not sclass.which('docker'):
 
-        # MacOSx
-        if sys.platform == 'darwin':
-            pass
-
         # TODO: Ask Hannes about making subprocess calls with sudo
-        elif sys.platform == 'ubuntu':
+        if 'linux' in sys.platform :
             subprocess.check_call(['sudo', 'apt-get', 'update'])
             subprocess.check_call(['sudo', 'apt-get', 'install', 'linux-image-generic-lts-trusty'])
 
             if not sclass.which('wget'):
                 try:
                     subprocess.check_call(['sudo', 'apt-get', 'install', 'wget'])
-                except:
+                except subprocess.CalledProcessError:
                     raise RuntimeError('Could not install wget, which is required to install Docker')
+                except OSError:
+                    raise RuntimeError('Could not find apt-get! This OS should (apt) get with the program.')
 
-            subprocess.check_call(['wget', '-qO-', 'https://get.docker.com/', '|', 'sh'])
+            try:
+                subprocess.check_call(['wget', '-qO-', 'https://get.docker.com/', '|', 'sh'])
+            except subprocess.CalledProcessError:
+                raise RuntimeError('Failed to install docker on system: https://docs.docker.com/installation/')
 
             assert sclass.which('docker')
 
-        elif sys.platform == 'windows':
-            pass
+        elif 'darwin' in sys.platform:
+            raise RuntimeError('Docker not installed! Install on Mac here: https://docs.docker.com/installation/mac/')
+
+        elif 'win' in sys.platform:
+            raise RuntimeError('Docker not installed! Install on Windows: https://docs.docker.com/installation/windows')
+
+        else:
+            raise RuntimeError('Docker not installed. Check if available on your system: https://docs.docker.com/installation/')
+
+    target.addChildTargetFn(pull_tool_images, (sclass,))
+
+def pull_tool_images(target, sclass):
+    """
+    pulls required tool images from dockerhub
+    Tools:  Samtools, Picardtools, MuTect
+    """
+    try:
+        subprocess.check_call(['sudo', 'docker', 'pull', 'jvivian/samtools'])
+
+    pass
 
 
 def main():
