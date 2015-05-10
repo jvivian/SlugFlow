@@ -55,16 +55,13 @@ class SupportClass(object):
                                      'bd2k-{}'.format(os.path.basename(__file__).split('.')[0]),
                                      str(uuid.uuid4()))
 
-        self.ids = {x : target.getEmptyFileStoreID() for x in self.symbolic_inputs}
+        # Dictionary of all FileStoreIds for all input files used in the pipeline
+        self.ids = {x: target.getEmptyFileStoreID() for x in self.symbolic_inputs}
 
-    def read_and_rename_global_file(self, target, file_store_id, new_extension, diff_name=None):
-        """
-        Finds path to file via FileStoreID and takes back control of the extension and filename.
-        """
-        name = target.readGlobalFile(file_store_id)
-        new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
-        os.rename(name, new_name)
-        return new_name
+        # Dictionary of all tools and their associated docker image
+        self.tools = {'samtools': 'jvivian/samtools',
+                      'picard': 'jvivian/picardtools',
+                      'mutect': 'jvivian/mutect'}
 
     def unavoidable_download_method(self, name):
         """
@@ -90,6 +87,16 @@ class SupportClass(object):
         return file_path
 
     @staticmethod
+    def read_and_rename_global_file(target, file_store_id, new_extension, diff_name=None):
+        """
+        Finds path to file via FileStoreID and takes back control of the extension and filename.
+        """
+        name = target.readGlobalFile(file_store_id)
+        new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
+        os.rename(name, new_name)
+        return new_name
+
+    @staticmethod
     def mkdir_p(path):
         """
         The equivalent of mkdir -p
@@ -109,6 +116,7 @@ class SupportClass(object):
         http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
         """
         import os
+
         def is_exe(fpath):
             return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -125,17 +133,17 @@ class SupportClass(object):
 
         return None
 
-            ####    Begin Pipeline    ####
+
 def check_for_docker(target, args, input_urls, symbolic_inputs):
     """
     Checks if Docker is present on system -- installs on linux if not present.
     """
-    sclass = SupportClass(args, input_urls, symbolic_inputs)
+    sclass = SupportClass(args, args, input_urls, symbolic_inputs)
 
     if not sclass.which('docker'):
 
         # TODO: Ask Hannes about making subprocess calls with sudo
-        if 'linux' in sys.platform :
+        if 'linux' in sys.platform:
             subprocess.check_call(['sudo', 'apt-get', 'update'])
             subprocess.check_call(['sudo', 'apt-get', 'install', 'linux-image-generic-lts-trusty'])
 
@@ -165,15 +173,23 @@ def check_for_docker(target, args, input_urls, symbolic_inputs):
 
     target.addChildTargetFn(pull_tool_images, (sclass,))
 
+
 def pull_tool_images(target, sclass):
     """
     pulls required tool images from dockerhub
     Tools:  Samtools, Picardtools, MuTect
     """
-    try:
-        subprocess.check_call(['sudo', 'docker', 'pull', 'jvivian/samtools'])
 
-    pass
+
+    # TODO: Should pulling docker images be multi-threaded?
+    for tool in tools:
+        try:
+            subprocess.check_call(['sudo', 'docker', 'pull', tools[tool]])
+        except subprocess.CalledProcessError:
+            raise RuntimeError('docker returned non-zero exit code attempting to pull.')
+        except OSError:
+            raise RuntimeError('System failed to find docker. Exiting.')
+
 
 
 def main():
