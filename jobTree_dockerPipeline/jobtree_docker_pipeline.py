@@ -21,6 +21,7 @@ Pipeline for Tumor/Normal Variant Calling
 import argparse
 import os
 import multiprocessing
+import shutil
 import subprocess
 import uuid
 import errno
@@ -122,7 +123,7 @@ class SupportClass(object):
         os.rename(name, new_name)
 
         # Move to work_dir so docker mount works
-        os.rename(new_name, os.path.join(self.work_dir, os.path.basename(new_name)))
+        shutil.move(new_name, os.path.join(self.work_dir, os.path.basename(new_name)))
 
         return os.path.join(self.work_dir, os.path.basename(new_name))
 
