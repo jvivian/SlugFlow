@@ -247,7 +247,7 @@ def create_reference_dict(target, sclass):
 
     # Tool call
     output = os.path.splitext(sclass.docker_path(ref_path))[0]
-    command = 'picard-tools CreateSequenceDictionary R={} O={}.dict'.format(sclass.docker_path(ref_path), output)
+    command = 'picard-tools CreateSequenceDictionary R={}.fasta O={}.dict'.format(sclass.docker_path(ref_path), output)
     sclass.docker_call(command, tool_name='picard')
 
     # Update FileStoreID
