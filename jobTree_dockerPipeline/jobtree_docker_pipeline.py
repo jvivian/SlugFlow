@@ -49,15 +49,17 @@ def build_parser():
 
 class SupportClass(object):
 
-    def __init__(self, target, args, input_urls, symbolic_inputs):
+    def __init__(self, target, args, input_urls):
         self.target = target
         self.args = args
         self.input_urls = input_urls
-        self.symbolic_inputs = symbolic_inputs
         self.cpu_count = multiprocessing.cpu_count()
         self.work_dir = os.path.join(str(self.args.work_dir),
                                      'bd2k-{}'.format(os.path.basename(__file__).split('.')[0]),
                                      str(uuid.uuid4()))
+
+        # symbolic names for all inputs in the pipeline
+        self.symbolic_inputs = self.input_urls.keys() + ['ref.fai', 'ref.dict', 'normal.bai', 'tumor.bai', 'mutect.vcf']
 
         # Dictionary of all FileStoreIds for all input files used in the pipeline
         self.ids = {x: target.getEmptyFileStoreID() for x in self.symbolic_inputs}
@@ -326,9 +328,12 @@ def mutect(target, sclass):
     sclass.docker_call(command, tool_name='mutect')
 
     # Update FileStoreID
-    target.updateGlobalFile(sclass.ids['mutect_vcf'],
+    target.updateGlobalFile(sclass.ids['mutect.vcf'],
                             os.path.join(sclass.work_dir, '{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid)))
 
+
+def teardown(target, sclass):
+    pass
 
 def main():
     # Handle parser logic
@@ -349,11 +354,8 @@ def main():
             raise RuntimeError('{} BAM is not in the appropriate format: \
             UUID.normal.bam or UUID.tumor.bam'.format(str(bam).split('.')[1]))
 
-    # Symbolic names for all inputs in the pipeline
-    symbolic_inputs = input_urls.keys() + ['ref.fai', 'ref.dict', 'normal.bai', 'tumor.bai', 'mutect.vcf']
-
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
-    i = Stack(Target.makeTargetFn(check_for_docker, (args, input_urls, symbolic_inputs))).startJobTree(args)
+    i = Stack(Target.makeTargetFn(check_for_docker, (args, input_urls))).startJobTree(args)
 
 
 if __name__ == '__main__':
