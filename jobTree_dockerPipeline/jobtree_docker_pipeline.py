@@ -119,6 +119,8 @@ class SupportClass(object):
         """
         name = target.readGlobalFile(file_store_id)
         new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
+        with open('/home/ubuntu/log.txt', 'a') as f:
+            f.write('\n{}\t{}'.format(name, new_name))
         os.rename(name, new_name)
         return new_name
 
