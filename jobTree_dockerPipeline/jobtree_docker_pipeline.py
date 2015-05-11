@@ -316,7 +316,7 @@ def mutect(target, sclass):
               '--out {} ' \
               '--cov {} ' \
               '--vcf {} '.format(15, ref_fasta, cosmic_path, dbsnp_path, normal_bam, tumor_bam, mut_out, mut_cov, output)
-    sclass.docker_path(command, tool_name='mutect')
+    sclass.docker_call(command, tool_name='mutect')
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['mutect_vcf'],
