@@ -228,14 +228,14 @@ def create_reference_index(target, sclass):
     Uses Samtools to create reference index file (.fasta.fai)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method(target,'ref_fasta')
+    ref_path = sclass.unavoidable_download_method(target,'ref.fasta')
 
     # Tool call
     command = 'samtools faidx {}'.format(sclass.docker_path(ref_path))
     sclass.docker_call(command, tool_name='samtools')
 
     # Update FileStoreID of output
-    target.updateGlobalFile(sclass.ids['ref_fai'], ref_path + '.fai')
+    target.updateGlobalFile(sclass.ids['ref.fai'], ref_path + '.fai')
 
 
 def create_reference_dict(target, sclass):
@@ -243,54 +243,54 @@ def create_reference_dict(target, sclass):
     Uses Picardtools to create reference dictionary (.dict)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method(target, 'ref_fasta')
+    ref_path = sclass.unavoidable_download_method(target, 'ref.fasta')
 
     # Tool call
     output = os.path.splitext(sclass.docker_path(ref_path))[0]
-    command = 'picard-tools CreateSequenceDictionary R={}.fasta O={}.dict'.format(sclass.docker_path(ref_path), output)
+    command = 'picard-tools CreateSequenceDictionary R={} O={}.dict'.format(sclass.docker_path(ref_path), output)
     sclass.docker_call(command, tool_name='picard')
 
     # Update FileStoreID
-    target.updateGlobalFile(sclass.ids['ref_dict'], os.path.splitext(ref_path)[0] + '.dict')
+    target.updateGlobalFile(sclass.ids['ref.dict'], os.path.splitext(ref_path)[0] + '.dict')
 
 
 def create_normal_index(target, sclass):
     # Retrieve normal bam
-    normal_path = sclass.unavoidable_download_method(target, 'normal_bam')
+    normal_path = sclass.unavoidable_download_method(target, 'normal.bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(normal_path))
     sclass.docker_call(command, tool_name='samtools')
 
     # Update FileStoreID
-    target.updateGlobalFile(sclass.ids['normal_bai'], normal_path + '.bai')
+    target.updateGlobalFile(sclass.ids['normal.bai'], normal_path + '.bai')
 
 
 def create_tumor_index(target, sclass):
     # Retrieve tumor bam
-    tumor_path = sclass.unavoidable_download_method(target, 'tumor_bam')
+    tumor_path = sclass.unavoidable_download_method(target, 'tumor.bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(tumor_path))
     sclass.docker_call(command, tool_name='samtools')
 
     # Update FileStoreID
-    target.updateGlobalFile(sclass.ids['tumor_bai'], tumor_path + '.bai')
+    target.updateGlobalFile(sclass.ids['tumor.bai'], tumor_path + '.bai')
 
 
 def mutect(target, sclass):
     # Retrieve necessary files
-    mutect_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'mutect_jar'))
-    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp_vcf'))
-    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic_vcf'))
+    mutect_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'mutect.jar'))
+    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp.vcf'))
+    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic.vcf'))
 
-    normal_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bam'], '.bam'))
-    normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bai'], '.bai', normal_bam))
-    tumor_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor_bam'], '.bam'))
-    tumor_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor_bai'], '.bai', tumor_bam))
-    ref_fasta = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fasta'], '.fasta'))
-    ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fai'], '.fasta.fai', ref_fasta))
-    ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_dict'], '.dict', ref_fasta))
+    normal_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal.bam'], '.bam'))
+    normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal.bai'], '.bai', normal_bam))
+    tumor_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor.bam'], '.bam'))
+    tumor_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor.bai'], '.bai', tumor_bam))
+    ref_fasta = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.fasta'], '.fasta'))
+    ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.fai'], '.fasta.fai', ref_fasta))
+    ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.dict'], '.dict', ref_fasta))
 
     # Output VCF
     normal_uuid = sclass.input_urls['normal_bam'].split('/')[-1].split('.')[0]
@@ -323,12 +323,12 @@ def main():
     Stack.addJobTreeOptions(parser)
     args = parser.parse_args()
 
-    input_urls = {'ref_fasta': args.reference,
-                  'normal_bam': args.normal,
-                  'tumor_bam': args.tumor,
-                  'dbsnp_vcf': args.dbsnp,
-                  'cosmic_vcf': args.cosmic,
-                  'mutect_jar': args.mutect}
+    input_urls = {'ref.fasta': args.reference,
+                  'normal.bam': args.normal,
+                  'tumor.bam': args.tumor,
+                  'dbsnp.vcf': args.dbsnp,
+                  'cosmic.vcf': args.cosmic,
+                  'mutect.jar': args.mutect}
 
     # Ensure user supplied URLs to files and that BAMs are in the appropriate format
     for bam in [args.normal, args.tumor]:
@@ -337,7 +337,7 @@ def main():
             UUID.normal.bam or UUID.tumor.bam'.format(str(bam).split('.')[1]))
 
     # Symbolic names for all inputs in the pipeline
-    symbolic_inputs = input_urls.keys() + ['ref_fai', 'ref_dict', 'normal_bai', 'tumor_bai', 'mutect_vcf']
+    symbolic_inputs = input_urls.keys() + ['ref.fai', 'ref.dict', 'normal.bai', 'tumor.bai', 'mutect.vcf']
 
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
     i = Stack(Target.makeTargetFn(check_for_docker, (args, input_urls, symbolic_inputs))).startJobTree(args)
