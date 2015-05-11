@@ -299,8 +299,8 @@ def mutect(target, sclass):
     ref_fasta = sclass.docker_path(ref_fasta)
 
     # Output VCF
-    normal_uuid = sclass.input_urls['normal_bam'].split('/')[-1].split('.')[0]
-    tumor_uuid = sclass.input_urls['tumor_bam'].split('/')[-1].split('.')[0]
+    normal_uuid = sclass.input_urls['normal.bam'].split('/')[-1].split('.')[0]
+    tumor_uuid = sclass.input_urls['tumor.bam'].split('/')[-1].split('.')[0]
     output = sclass.docker_path('{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid))
     mut_out = sclass.docker_path('mutect.out')
     mut_cov = sclass.docker_path('mutect.cov')
