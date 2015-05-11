@@ -312,11 +312,11 @@ def mutect(target, sclass):
               '--reference_sequence {2} ' \
               '--cosmic {3} ' \
               '--dbsnp {4} ' \
-              '--input_filename:normal {5} ' \
-              '--input_filename:tumor {6} ' \
+              '--input_file:normal {5} ' \
+              '--input_file:tumor {6} ' \
               '--tumor_lod 10 ' \
               '--out {7} ' \
-              '--cov {8} ' \
+              '--coverage_file {8} ' \
               '--vcf {9} '.format(15, mutect_path, ref_fasta, cosmic_path, dbsnp_path, normal_bam,
                                   tumor_bam, mut_out, mut_cov, output)
     sclass.docker_call(command, tool_name='mutect')
