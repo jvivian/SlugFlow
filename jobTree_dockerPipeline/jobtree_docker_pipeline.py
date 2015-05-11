@@ -112,7 +112,8 @@ class SupportClass(object):
     def docker_path(filepath):
         return os.path.join('/data', os.path.basename(filepath))
 
-    def read_and_rename_global_file(self, target, file_store_id, new_extension, diff_name=None):
+    @staticmethod
+    def read_and_rename_global_file(target, file_store_id, new_extension, diff_name=None):
         """
         Finds path to file via FileStoreID and takes back control of the extension and filename.
         """
@@ -306,16 +307,18 @@ def mutect(target, sclass):
     mut_cov = sclass.docker_path('mutect.cov')
 
     # Tool call
-    command = 'java -Xmx{}g -jar --analysis_type MuTect ' \
-              '--reference_sequence {} ' \
-              '--cosmic {} ' \
-              '--dbsnp {} ' \
-              '--input_filename:normal {} ' \
-              '--input_filename:tumor {} ' \
+    command = 'java -Xmx{0}g -jar {1} ' \
+              '--analysis_type MuTect ' \
+              '--reference_sequence {2} ' \
+              '--cosmic {3} ' \
+              '--dbsnp {4} ' \
+              '--input_filename:normal {5} ' \
+              '--input_filename:tumor {6} ' \
               '--tumor_lod 10 ' \
-              '--out {} ' \
-              '--cov {} ' \
-              '--vcf {} '.format(15, ref_fasta, cosmic_path, dbsnp_path, normal_bam, tumor_bam, mut_out, mut_cov, output)
+              '--out {7} ' \
+              '--cov {8} ' \
+              '--vcf {9} '.format(15, mutect_path, ref_fasta, cosmic_path, dbsnp_path, normal_bam,
+                                  tumor_bam, mut_out, mut_cov, output)
     sclass.docker_call(command, tool_name='mutect')
 
     # Update FileStoreID
