@@ -15,6 +15,8 @@ Pipeline for Tumor/Normal Variant Calling
         v
       MuTect
 
+1. Given the use of containerized tools, all output should be directed to: os.path.join(/data, filename)
+2. target.updateGlobalFile() should be to:  os.path.join(work_dir, filename)
 """
 import argparse
 import os
@@ -84,7 +86,30 @@ class SupportClass(object):
 
         assert os.path.exists(file_path)
 
+        # Update FileStoreID
+
+
         return file_path
+
+    def docker_call(self, tool_command, tool_name):
+        """
+        :type tool_command: str
+        :type tool_name: str
+        :param tool_name: a key to the dictionary self.tools
+
+        Makes subprocess call to docker given a command and a tool_name
+        """
+        base_docker_call = 'sudo docker run -v {}:/data'.format(self.work_dir)
+        try:
+            subprocess.check_call(base_docker_call.split() + [self.tools[tool_name]] + tool_command.split())
+        except subprocess.CalledProcessError:
+            raise RuntimeError('docker command returned a non-zero exit status. Check error logs.')
+        except OSError:
+            raise RuntimeError('docker not found on system. Install on all nodes.')
+
+    @staticmethod
+    def docker_path(filepath):
+        return os.path.join('/data', os.path.basename(filepath))
 
     @staticmethod
     def read_and_rename_global_file(target, file_store_id, new_extension, diff_name=None):
@@ -134,6 +159,7 @@ class SupportClass(object):
         return None
 
 
+# TODO: Ask Hannes about installation of software on distributed nodes -- make check at beginning of every target?
 def check_for_docker(target, args, input_urls, symbolic_inputs):
     """
     Checks if Docker is present on system -- installs on linux if not present.
@@ -179,18 +205,59 @@ def pull_tool_images(target, sclass):
     pulls required tool images from dockerhub
     Tools:  Samtools, Picardtools, MuTect
     """
-
-
     # TODO: Should pulling docker images be multi-threaded?
-    for tool in tools:
+    # TODO: Should pulling docker images be done lazily? I.E. during execution of 'docker run' -- I am leaning towards yes...
+    for tool in sclass.tools:
         try:
-            subprocess.check_call(['sudo', 'docker', 'pull', tools[tool]])
+            subprocess.check_call(['sudo', 'docker', 'pull', sclass.tools[tool]])
         except subprocess.CalledProcessError:
             raise RuntimeError('docker returned non-zero exit code attempting to pull.')
         except OSError:
             raise RuntimeError('System failed to find docker. Exiting.')
 
+    target.addChildTargetFn()
 
+
+def create_reference_index(target, sclass):
+    """
+    Uses Samtools to create reference index file (.fasta.fai)
+    """
+    # Retrieve reference & store in FileStoreID
+    ref_path = sclass.unavoidable_download_method('ref_fasta')
+    target.updateGlobalFile(sclass.ids['ref_fasta'], ref_path)
+
+    # Tool call
+    command = 'samtools faidx {}'.format(sclass.docker_path(ref_path))
+    sclass.docker_call(tool_command=command, tool_name='samtools')
+
+    # Update FileStoreID of output
+    target.updateGlobalFile(sclass.ids['ref_fai'], ref_path + '.fai')
+
+def create_reference_dict(target, sclass):
+    """
+    Uses Picardtools to create reference dictionary (.dict)
+    """
+    # Retrieve reference & store in FileStoreID
+    ref_path = sclass.unavoidable_download_method('ref_fasta')
+    target.updateGlobalFile(sclass.ids['ref_fasta'], ref_path)
+
+    # Tool call
+    output = os.path.splitext(ref_path)[0]
+    command = 'picard-tools CreateSequenceDictionary R={} O={}.dict'.format(sclass.docker_path(ref_path), output)
+    sclass.docker_call(tool_command=command, tool_name='picard')
+
+    # Update FileStoreID
+    target.updateGlobalFile(sclass.ids['ref_dict'], os.path.splitext(ref_path)[0] + '.dict')
+
+def create_normal_index(target, sclass):
+    normal_path = sclass.unavoidable_download_method('normal_bam')
+    target.updateGlobalFile(sclass.ids['normal_bam'], normal_path)
+
+def create_tumor_index(target, sclass):
+    pass
+
+def mutect(target, sclass):
+    pass
 
 def main():
     # Handle parser logic
@@ -198,12 +265,12 @@ def main():
     Stack.addJobTreeOptions(parser)
     args = parser.parse_args()
 
-    input_urls = {'reference.fasta': args.reference,
-                  'normal.bam': args.normal,
-                  'tumor.bam': args.tumor,
-                  'dbsnp.vcf': args.dbsnp,
-                  'cosmic.vcf': args.cosmic,
-                  'mutect.jar': args.mutect}
+    input_urls = {'ref_fasta': args.reference,
+                  'normal_bam': args.normal,
+                  'tumor_bam': args.tumor,
+                  'dbsnp_vcf': args.dbsnp,
+                  'cosmic_vcf': args.cosmic,
+                  'mutect_jar': args.mutect}
 
     # Ensure user supplied URLs to files and that BAMs are in the appropriate format
     for bam in [args.normal, args.tumor]:
@@ -212,8 +279,7 @@ def main():
             UUID.normal.bam or UUID.tumor.bam'.format(str(bam).split('.')[1]))
 
     # Symbolic names for all inputs in the pipeline
-    symbolic_inputs = ['ref_fasta', 'ref_fai', 'ref_dict', 'normal_bam', 'normal_bai', 'tumor_bam',
-                       'tumor_bai', 'cosmic_vcf', 'mutect_jar', 'mutect_vcf', 'mutect_out', 'mutect_cov']
+    symbolic_inputs = input_urls.keys() + ['ref_fai', 'ref_dict', 'normal_bai', 'tumor_bai', 'mutect_vcf']
 
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
     i = Stack(Target.makeTargetFn( __ , (args, input_urls, symbolic_inputs))).startJobTree(args)
