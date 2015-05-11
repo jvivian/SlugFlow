@@ -15,7 +15,7 @@ Pipeline for Tumor/Normal Variant Calling
         v
       MuTect
 
-1. Given the use of containerized tools, all output should be directed to: os.path.join(/data, filename)
+1. Given the use of containerized tools, all input/output should be directed to/from: os.path.join(/data, filename)
 2. target.updateGlobalFile() should be to:  os.path.join(work_dir, filename)
 """
 import argparse
@@ -49,6 +49,7 @@ def build_parser():
 class SupportClass(object):
 
     def __init__(self, target, args, input_urls, symbolic_inputs):
+        self.target = target
         self.args = args
         self.input_urls = input_urls
         self.symbolic_inputs = symbolic_inputs
@@ -65,7 +66,7 @@ class SupportClass(object):
                       'picard': 'jvivian/picardtools',
                       'mutect': 'jvivian/mutect'}
 
-    def unavoidable_download_method(self, name):
+    def unavoidable_download_method(self, target, name):
         """
         Accepts key from self.input_urls -- Downloads if not present. returns path to file.
         """
@@ -87,7 +88,7 @@ class SupportClass(object):
         assert os.path.exists(file_path)
 
         # Update FileStoreID
-
+        target.updateGlobalFile(self.ids[name], file_path)
 
         return file_path
 
@@ -215,7 +216,11 @@ def pull_tool_images(target, sclass):
         except OSError:
             raise RuntimeError('System failed to find docker. Exiting.')
 
-    target.addChildTargetFn()
+    target.addChildTargetFn(create_reference_index, (sclass,))
+    target.addChildTargetFn(create_reference_dict, (sclass,))
+    target.addChildTargetFn(create_normal_index, (sclass,))
+    target.addChildTargetFn(create_tumor_index, (sclass,))
+    target.setFollowOnTargetFn(mutect, (sclass,))
 
 
 def create_reference_index(target, sclass):
@@ -223,15 +228,15 @@ def create_reference_index(target, sclass):
     Uses Samtools to create reference index file (.fasta.fai)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method('ref_fasta')
-    target.updateGlobalFile(sclass.ids['ref_fasta'], ref_path)
+    ref_path = sclass.unavoidable_download_method(target,'ref_fasta')
 
     # Tool call
     command = 'samtools faidx {}'.format(sclass.docker_path(ref_path))
-    sclass.docker_call(tool_command=command, tool_name='samtools')
+    sclass.docker_call(command, tool_name='samtools')
 
     # Update FileStoreID of output
     target.updateGlobalFile(sclass.ids['ref_fai'], ref_path + '.fai')
+
 
 def create_reference_dict(target, sclass):
     """
@@ -239,25 +244,67 @@ def create_reference_dict(target, sclass):
     """
     # Retrieve reference & store in FileStoreID
     ref_path = sclass.unavoidable_download_method('ref_fasta')
-    target.updateGlobalFile(sclass.ids['ref_fasta'], ref_path)
 
     # Tool call
-    output = os.path.splitext(ref_path)[0]
+    output = os.path.splitext(sclass.docker_path(ref_path))[0]
     command = 'picard-tools CreateSequenceDictionary R={} O={}.dict'.format(sclass.docker_path(ref_path), output)
-    sclass.docker_call(tool_command=command, tool_name='picard')
+    sclass.docker_call(command, tool_name='picard')
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['ref_dict'], os.path.splitext(ref_path)[0] + '.dict')
 
+
 def create_normal_index(target, sclass):
+    # Retrieve normal bam
     normal_path = sclass.unavoidable_download_method('normal_bam')
-    target.updateGlobalFile(sclass.ids['normal_bam'], normal_path)
+
+    # Tool call
+    command = 'samtools index {}'.format(sclass.docker_path(normal_path))
+    sclass.docker_call(command, tool_name='samtools')
+
+    # Update FileStoreID
+    target.updateGlobalFile(sclass.ids['normal_bai'], normal_path + '.bai')
+
 
 def create_tumor_index(target, sclass):
-    pass
+    # Retrieve tumor bam
+    tumor_path = sclass.unavoidable_download_method('tumor_path')
+
+    # Tool call
+    command = 'samtools index {}'.format(sclass.docker_path(tumor_path))
+    sclass.docker_call(command, tool_name='samtools')
+
+    # Update FileStoreID
+    target.updateGlobalFile(sclass.ids['tumor_bai'], tumor_path + '.bai')
+
 
 def mutect(target, sclass):
-    pass
+    # Retrieve necessary files
+    mutect_path = sclass.docker_path(sclass.unavoidable_download_method('mutect_jar'))
+    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method('dbsnp_vcf'))
+    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method('cosmic_vcf'))
+    ref_fasta = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fasta'], '.fasta'))
+    ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fai'], '.fasta.fai', ref_fasta))
+    ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_dict'], '.dict', ref_fasta))
+
+    # Output VCF
+    normal_uuid = sclass.input_urls['normal_bam'].split('/')[-1].split('.')[0]
+    tumor_uuid = sclass.input_urls['tumor_bam'].split('/')[-1].split('.')[0]
+    output = sclass.docker_path('{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid))
+    mut_out = sclass.docker_path('mutect.out')
+    mut_cov = sclass.docker_path('mutect.cov')
+
+    # Tool call
+    command = 'java -Xmx{}g -jar --analysis_type MuTect ' \
+              '--reference_sequence {} ' \
+              '--cosmic {} ' \
+              '--dbsnp {} ' \
+              '--input_filename:normal {} ' \
+              '--input_filename:tumor {} ' \
+              '--tumor_lod 10 ' \
+              '--out {} ' \
+              '--cov {} ' \
+              '--vcf {} '.format(15, )
 
 def main():
     # Handle parser logic
