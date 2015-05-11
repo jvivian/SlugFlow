@@ -112,15 +112,13 @@ class SupportClass(object):
     def docker_path(filepath):
         return os.path.join('/data', os.path.basename(filepath))
 
-    @staticmethod
-    def read_and_rename_global_file(target, file_store_id, new_extension, diff_name=None):
+    def read_and_rename_global_file(self, target, file_store_id, new_extension, diff_name=None):
         """
         Finds path to file via FileStoreID and takes back control of the extension and filename.
         """
         name = target.readGlobalFile(file_store_id)
         new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
-        with open('/home/ubuntu/log.txt', 'a') as f:
-            f.write('\n{}\t{}'.format(name, new_name))
+        #new_name = os.path.splitext(name if diff_name is None else os.path.join(self.work_dir, os.path.basename(diff_name)))[0] + new_extension
         os.rename(name, new_name)
         return new_name
 
@@ -286,13 +284,19 @@ def mutect(target, sclass):
     dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp.vcf'))
     cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic.vcf'))
 
-    normal_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal.bam'], '.bam'))
+    # TODO: group files that hae been downloaded (dict? tuple?) and loop over read_rename
+    normal_bam = sclass.read_and_rename_global_file(target, sclass.ids['normal.bam'], '.bam')
     normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal.bai'], '.bai', normal_bam))
-    tumor_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor.bam'], '.bam'))
+    tumor_bam = sclass.read_and_rename_global_file(target, sclass.ids['tumor.bam'], '.bam')
     tumor_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor.bai'], '.bai', tumor_bam))
-    ref_fasta = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.fasta'], '.fasta'))
+    ref_fasta = sclass.read_and_rename_global_file(target, sclass.ids['ref.fasta'], '.fasta')
     ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.fai'], '.fasta.fai', ref_fasta))
     ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.dict'], '.dict', ref_fasta))
+
+    # TODO: Fix read_and_rename... to avoid having to recast vars
+    normal_bam = sclass.docker_path(normal_bam)
+    tumor_bam = sclass.docker_path(tumor_bam)
+    ref_fasta = sclass.docker_path(ref_fasta)
 
     # Output VCF
     normal_uuid = sclass.input_urls['normal_bam'].split('/')[-1].split('.')[0]
