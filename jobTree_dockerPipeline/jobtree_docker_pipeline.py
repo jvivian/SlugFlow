@@ -62,9 +62,9 @@ class SupportClass(object):
         self.ids = {x: target.getEmptyFileStoreID() for x in self.symbolic_inputs}
 
         # Dictionary of all tools and their associated docker image
-        self.tools = {'samtools': 'jvivian/samtools',
-                      'picard': 'jvivian/picardtools',
-                      'mutect': 'jvivian/mutect'}
+        self.tools = {'samtools': 'jvivian/samtools:1.2',
+                      'picard': 'jvivian/picardtools:1.113',
+                      'mutect': 'jvivian/mutect:1.1.7'}
 
     def unavoidable_download_method(self, target, name):
         """
@@ -268,7 +268,7 @@ def create_normal_index(target, sclass):
 
 def create_tumor_index(target, sclass):
     # Retrieve tumor bam
-    tumor_path = sclass.unavoidable_download_method(target, 'tumor_path')
+    tumor_path = sclass.unavoidable_download_method(target, 'tumor_bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(tumor_path))
