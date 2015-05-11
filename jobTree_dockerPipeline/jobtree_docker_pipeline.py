@@ -283,6 +283,11 @@ def mutect(target, sclass):
     mutect_path = sclass.docker_path(sclass.unavoidable_download_method('mutect_jar'))
     dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method('dbsnp_vcf'))
     cosmic_path = sclass.docker_path(sclass.unavoidable_download_method('cosmic_vcf'))
+
+    normal_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bam'], '.bam'))
+    normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bai'], '.bai', normal_bam))
+    tumor_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor_bam'], '.bam'))
+    tumor_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor_bai'], '.bai', tumor_bam))
     ref_fasta = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fasta'], '.fasta'))
     ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_fai'], '.fasta.fai', ref_fasta))
     ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref_dict'], '.dict', ref_fasta))
@@ -304,7 +309,13 @@ def mutect(target, sclass):
               '--tumor_lod 10 ' \
               '--out {} ' \
               '--cov {} ' \
-              '--vcf {} '.format(15, )
+              '--vcf {} '.format(15, ref_fasta, cosmic_path, dbsnp_path, normal_bam, tumor_bam, mut_out, mut_cov, output)
+    sclass.docker_path(command, tool_name='mutect')
+
+    # Update FileStoreID
+    target.updateGlobalFile(sclass.ids['mutect_vcf'],
+                            os.path.join(sclass.work_dir, '{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid)))
+
 
 def main():
     # Handle parser logic
@@ -329,9 +340,9 @@ def main():
     symbolic_inputs = input_urls.keys() + ['ref_fai', 'ref_dict', 'normal_bai', 'tumor_bai', 'mutect_vcf']
 
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
-    i = Stack(Target.makeTargetFn( __ , (args, input_urls, symbolic_inputs))).startJobTree(args)
+    i = Stack(Target.makeTargetFn(check_for_docker , (args, input_urls, symbolic_inputs))).startJobTree(args)
 
 
 if __name__ == '__main__':
-    #from jobtree_docker_pipeline import *
+    # from jobtree_docker_pipeline import *
     main()
