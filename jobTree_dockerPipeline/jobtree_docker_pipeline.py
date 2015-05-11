@@ -112,8 +112,7 @@ class SupportClass(object):
     def docker_path(filepath):
         return os.path.join('/data', os.path.basename(filepath))
 
-    @staticmethod
-    def read_and_rename_global_file(target, file_store_id, new_extension, diff_name=None):
+    def read_and_rename_global_file(self, target, file_store_id, new_extension, diff_name=None):
         """
         Finds path to file via FileStoreID and takes back control of the extension and filename.
         """
@@ -121,7 +120,11 @@ class SupportClass(object):
         new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
         #new_name = os.path.splitext(name if diff_name is None else os.path.join(self.work_dir, os.path.basename(diff_name)))[0] + new_extension
         os.rename(name, new_name)
-        return new_name
+
+        # Move to work_dir so docker mount works
+        os.rename(new_name, os.path.join(self.work_dir, os.path.basename(new_name)))
+
+        return os.path.join(self.work_dir, os.path.basename(new_name))
 
     @staticmethod
     def mkdir_p(path):
