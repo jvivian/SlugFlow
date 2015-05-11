@@ -120,7 +120,7 @@ class SupportClass(object):
         name = target.readGlobalFile(file_store_id)
         new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
         #new_name = os.path.splitext(name if diff_name is None else os.path.join(self.work_dir, os.path.basename(diff_name)))[0] + new_extension
-        os.rename(name, new_name)
+        shutil.move(name, new_name)
 
         # Move to work_dir so docker mount works
         shutil.move(new_name, os.path.join(self.work_dir, os.path.basename(new_name)))
