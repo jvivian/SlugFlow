@@ -165,7 +165,7 @@ def check_for_docker(target, args, input_urls, symbolic_inputs):
     """
     Checks if Docker is present on system -- installs on linux if not present.
     """
-    sclass = SupportClass(args, args, input_urls, symbolic_inputs)
+    sclass = SupportClass(target, args, input_urls, symbolic_inputs)
 
     if not sclass.which('docker'):
 
