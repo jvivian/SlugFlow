@@ -243,7 +243,7 @@ def create_reference_dict(target, sclass):
     Uses Picardtools to create reference dictionary (.dict)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method('ref_fasta')
+    ref_path = sclass.unavoidable_download_method(target, 'ref_fasta')
 
     # Tool call
     output = os.path.splitext(sclass.docker_path(ref_path))[0]
@@ -256,7 +256,7 @@ def create_reference_dict(target, sclass):
 
 def create_normal_index(target, sclass):
     # Retrieve normal bam
-    normal_path = sclass.unavoidable_download_method('normal_bam')
+    normal_path = sclass.unavoidable_download_method(target, 'normal_bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(normal_path))
@@ -268,7 +268,7 @@ def create_normal_index(target, sclass):
 
 def create_tumor_index(target, sclass):
     # Retrieve tumor bam
-    tumor_path = sclass.unavoidable_download_method('tumor_path')
+    tumor_path = sclass.unavoidable_download_method(target, 'tumor_path')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(tumor_path))
@@ -280,9 +280,9 @@ def create_tumor_index(target, sclass):
 
 def mutect(target, sclass):
     # Retrieve necessary files
-    mutect_path = sclass.docker_path(sclass.unavoidable_download_method('mutect_jar'))
-    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method('dbsnp_vcf'))
-    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method('cosmic_vcf'))
+    mutect_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'mutect_jar'))
+    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp_vcf'))
+    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic_vcf'))
 
     normal_bam = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bam'], '.bam'))
     normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal_bai'], '.bai', normal_bam))
@@ -340,7 +340,7 @@ def main():
     symbolic_inputs = input_urls.keys() + ['ref_fai', 'ref_dict', 'normal_bai', 'tumor_bai', 'mutect_vcf']
 
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
-    i = Stack(Target.makeTargetFn(check_for_docker , (args, input_urls, symbolic_inputs))).startJobTree(args)
+    i = Stack(Target.makeTargetFn(check_for_docker, (args, input_urls, symbolic_inputs))).startJobTree(args)
 
 
 if __name__ == '__main__':
