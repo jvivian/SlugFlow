@@ -168,11 +168,11 @@ class SupportClass(object):
 
 
 # TODO: Ask Hannes about installation of software on distributed nodes -- make check at beginning of every target?
-def check_for_docker(target, args, input_urls, symbolic_inputs):
+def check_for_docker(target, args, input_urls):
     """
     Checks if Docker is present on system -- installs on linux if not present.
     """
-    sclass = SupportClass(target, args, input_urls, symbolic_inputs)
+    sclass = SupportClass(target, args, input_urls)
 
     if not sclass.which('docker'):
 
@@ -204,24 +204,6 @@ def check_for_docker(target, args, input_urls, symbolic_inputs):
 
         else:
             raise RuntimeError('Docker not installed. Check if available on your system: https://docs.docker.com/installation/')
-
-    target.addChildTargetFn(pull_tool_images, (sclass,))
-
-
-def pull_tool_images(target, sclass):
-    """
-    pulls required tool images from dockerhub
-    Tools:  Samtools, Picardtools, MuTect
-    """
-    # TODO: Should pulling docker images be multi-threaded?
-    # TODO: Should pulling docker images be done lazily? I.E. during execution of 'docker run' -- I am leaning towards yes...
-    for tool in sclass.tools:
-        try:
-            subprocess.check_call(['sudo', 'docker', 'pull', sclass.tools[tool]])
-        except subprocess.CalledProcessError:
-            raise RuntimeError('docker returned non-zero exit code attempting to pull.')
-        except OSError:
-            raise RuntimeError('System failed to find docker. Exiting.')
 
     target.addChildTargetFn(create_reference_index, (sclass,))
     target.addChildTargetFn(create_reference_dict, (sclass,))
@@ -327,13 +309,18 @@ def mutect(target, sclass):
                                   tumor_bam, mut_out, mut_cov, output)
     sclass.docker_call(command, tool_name='mutect')
 
-    # Update FileStoreID
+    # Update FileStoreID TODO: Once AWS is implemented this would upload final result to S3?
     target.updateGlobalFile(sclass.ids['mutect.vcf'],
                             os.path.join(sclass.work_dir, '{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid)))
 
+    target.addChildTargetFn(teardown, (sclass,))
+
 
 def teardown(target, sclass):
-    pass
+    files = [os.path.join(sclass.work_dir, f) for f in os.listdir(sclass.work_dir) if 'tumor.vcf' not in f]
+    for f in files:
+        os.remove(f)
+
 
 def main():
     # Handle parser logic
