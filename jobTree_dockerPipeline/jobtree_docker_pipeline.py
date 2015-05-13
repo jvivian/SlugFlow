@@ -238,7 +238,7 @@ def create_reference_index(target, sclass):
     Uses Samtools to create reference index file (.fasta.fai)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method(target, 'ref.fasta')
+    ref_path = sclass.unavoidable_download_method('ref.fasta')
 
     # Tool call
     command = 'samtools faidx {}'.format(sclass.docker_path(ref_path))
@@ -253,7 +253,7 @@ def create_reference_dict(target, sclass):
     Uses Picardtools to create reference dictionary (.dict)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method(target, 'ref.fasta')
+    ref_path = sclass.unavoidable_download_method('ref.fasta')
 
     # Tool call
     output = os.path.splitext(sclass.docker_path(ref_path))[0]
@@ -266,7 +266,7 @@ def create_reference_dict(target, sclass):
 
 def create_normal_index(target, sclass):
     # Retrieve normal bam
-    normal_path = sclass.unavoidable_download_method(target, 'normal.bam')
+    normal_path = sclass.unavoidable_download_method('normal.bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(normal_path))
@@ -278,7 +278,7 @@ def create_normal_index(target, sclass):
 
 def create_tumor_index(target, sclass):
     # Retrieve tumor bam
-    tumor_path = sclass.unavoidable_download_method(target, 'tumor.bam')
+    tumor_path = sclass.unavoidable_download_method('tumor.bam')
 
     # Tool call
     command = 'samtools index {}'.format(sclass.docker_path(tumor_path))
@@ -290,19 +290,19 @@ def create_tumor_index(target, sclass):
 
 def mutect(target, sclass):
     # Retrieve inputs that are not in FileStore
-    mutect_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'mutect.jar'))
-    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp.vcf'))
-    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic.vcf'))
+    mutect_path = sclass.docker_path(sclass.unavoidable_download_method('mutect.jar'))
+    dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method('dbsnp.vcf'))
+    cosmic_path = sclass.docker_path(sclass.unavoidable_download_method('cosmic.vcf'))
 
     # TODO: Figure out how to refactor... the renaming convention makes it difficult.
     # TODO: Otherwise, I would just iterate over the sclass.StoredSet() object.
-    normal_bam = sclass.read_and_rename_global_file(target, sclass.ids['normal.bam'], '.bam')
-    tumor_bam = sclass.read_and_rename_global_file(target, sclass.ids['tumor.bam'], '.bam')
-    ref_fasta = sclass.read_and_rename_global_file(target, sclass.ids['ref.fasta'], '.fasta')
-    sclass.read_and_rename_global_file(target, sclass.ids['normal.bai'], '.bai', normal_bam)
-    sclass.read_and_rename_global_file(target, sclass.ids['tumor.bai'], '.bai', tumor_bam)
-    sclass.read_and_rename_global_file(target, sclass.ids['ref.fai'], '.fasta.fai', ref_fasta)
-    sclass.read_and_rename_global_file(target, sclass.ids['ref.dict'], '.dict', ref_fasta)
+    normal_bam = sclass.read_and_rename_global_file(sclass.ids['normal.bam'], '.bam')
+    tumor_bam = sclass.read_and_rename_global_file(sclass.ids['tumor.bam'], '.bam')
+    ref_fasta = sclass.read_and_rename_global_file(sclass.ids['ref.fasta'], '.fasta')
+    sclass.read_and_rename_global_file(sclass.ids['normal.bai'], '.bai', normal_bam)
+    sclass.read_and_rename_global_file(sclass.ids['tumor.bai'], '.bai', tumor_bam)
+    sclass.read_and_rename_global_file(sclass.ids['ref.fai'], '.fasta.fai', ref_fasta)
+    sclass.read_and_rename_global_file(sclass.ids['ref.dict'], '.dict', ref_fasta)
 
     # TODO: Fix this... having to recast these variables is clunky.
     normal_bam = sclass.docker_path(normal_bam)
@@ -349,7 +349,7 @@ def main():
     parser = build_parser()
     Stack.addJobTreeOptions(parser)
     args = parser.parse_args()
-    print type(args)
+    # TODO: Ask Hannes the easiest way to obtain "special type" i.e. target instance, args, etc...
 
     # URLs to rerieve initial input files
     input_urls = {'ref.fasta': args.reference,
