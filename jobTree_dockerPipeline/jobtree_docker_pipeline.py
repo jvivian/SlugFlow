@@ -33,7 +33,7 @@ from jobTree.src.target import Target
 
 def build_parser():
     """
-    Contains arguments for the all of necessary input files
+    Contains arguments for the all of necessary input files and work_directory
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--reference', required=True, help="Reference Genome URL")
@@ -48,17 +48,24 @@ def build_parser():
 
 
 class SupportClass(object):
-
+    """
+    Container for necessary information and methods that is passed through the pipeline
+    """
     def __init__(self, target, args, input_urls):
+        """
+        Variables and datatypes
+        """
         self.target = target
         self.args = args
         self.input_urls = input_urls
         self.cpu_count = multiprocessing.cpu_count()
+
+        # work_dir has following naming convenction: <user supplied dir>/<bd2k-<file_name>/<Random UUID4>/
         self.work_dir = os.path.join(str(self.args.work_dir),
                                      'bd2k-{}'.format(os.path.basename(__file__).split('.')[0]),
                                      str(uuid.uuid4()))
 
-        # symbolic names for all inputs in the pipeline
+        # Symbolic names for all inputs in the pipeline.
         self.symbolic_inputs = self.input_urls.keys() + ['ref.fai', 'ref.dict', 'normal.bai', 'tumor.bai', 'mutect.vcf']
 
         # Dictionary of all FileStoreIds for all input files used in the pipeline
@@ -69,9 +76,17 @@ class SupportClass(object):
                       'picard': 'jvivian/picardtools:1.113',
                       'mutect': 'jvivian/mutect:1.1.7'}
 
-    def unavoidable_download_method(self, target, name):
+        # TODO: Should this be a jobTree method of target? "Given a key, tell me if a file is linked to it"
+        # Set of symbolic_inputs that have a FileStoreID linked to a file
+        self.StoredSet = set()
+
+    def unavoidable_download_method(self, name):
         """
-        Accepts key from self.input_urls -- Downloads if not present. returns path to file.
+        Downloads file if not present from supplied URL.
+        Updates the FileStoreID to point to a file.
+        :name: Key from self.input_urls.
+        :returns: Path to file (work_dir path)
+        :rtype: str
         """
         # Get path to file
         file_path = os.path.join(self.work_dir, name)
@@ -91,17 +106,18 @@ class SupportClass(object):
         assert os.path.exists(file_path)
 
         # Update FileStoreID
-        target.updateGlobalFile(self.ids[name], file_path)
+        self.target.updateGlobalFile(self.ids[name], file_path)
+        self.StoredSet.add(name)
 
         return file_path
 
     def docker_call(self, tool_command, tool_name):
         """
+        Makes subprocess call of a command to a docker container.
+        Abstracts away the docker commands needed to run the tool.
         :type tool_command: str
         :type tool_name: str
         :param tool_name: a key to the dictionary self.tools
-
-        Makes subprocess call to docker given a command and a tool_name
         """
         base_docker_call = 'sudo docker run -v {}:/data'.format(self.work_dir)
         try:
@@ -111,16 +127,19 @@ class SupportClass(object):
         except OSError:
             raise RuntimeError('docker not found on system. Install on all nodes.')
 
+    # TODO: Ask Hannes about @staticmethod as well as _, __ method convention.
     @staticmethod
     def docker_path(filepath):
         return os.path.join('/data', os.path.basename(filepath))
 
-    def read_and_rename_global_file(self, target, file_store_id, new_extension, diff_name=None):
+    def read_and_rename_global_file(self, file_store_id, new_extension='', alternate_name=None):
         """
-        Finds path to file via FileStoreID and takes back control of the extension and filename.
+        Given a FileStoreID, returns the filepath linked to it.
+        :new_extension: Adds an extension to the file at the file_path.
+        :alternate_name: A path to a filename that you want to use. (allows directory control as well as name)
         """
-        name = target.readGlobalFile(file_store_id)
-        new_name = os.path.splitext(name if diff_name is None else diff_name)[0] + new_extension
+        name = self.target.readGlobalFile(file_store_id)
+        new_name = os.path.splitext(name if alternate_name is None else alternate_name)[0] + new_extension
         #new_name = os.path.splitext(name if diff_name is None else os.path.join(self.work_dir, os.path.basename(diff_name)))[0] + new_extension
         shutil.move(name, new_name)
 
@@ -146,6 +165,7 @@ class SupportClass(object):
     @staticmethod
     def which(program):
         """
+        The equivalant in bash of: which
         http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
         """
         import os
@@ -167,16 +187,18 @@ class SupportClass(object):
         return None
 
 
-# TODO: Ask Hannes about installation of software on distributed nodes -- make check at beginning of every target?
+# TODO: Ask Hannes about installation of software on distributed nodes.
+# This function could be considered unnecessary if it's the user's responsibility to install dependency software
 def check_for_docker(target, args, input_urls):
     """
     Checks if Docker is present on system -- installs on linux if not present.
     """
+    # Since this is the start node, instantiate support class instance to distribute to all other targets.
     sclass = SupportClass(target, args, input_urls)
 
     if not sclass.which('docker'):
 
-        # TODO: Ask Hannes about making subprocess calls with sudo
+        # TODO: Ask Hannes about making subprocess calls with sudo.
         if 'linux' in sys.platform:
             subprocess.check_call(['sudo', 'apt-get', 'update'])
             subprocess.check_call(['sudo', 'apt-get', 'install', 'linux-image-generic-lts-trusty'])
@@ -203,7 +225,7 @@ def check_for_docker(target, args, input_urls):
             raise RuntimeError('Docker not installed! Install on Windows: https://docs.docker.com/installation/windows')
 
         else:
-            raise RuntimeError('Docker not installed. Check if available on your system: https://docs.docker.com/installation/')
+            raise RuntimeError('Docker not installed. Check if available: https://docs.docker.com/installation/')
 
     target.addChildTargetFn(create_reference_index, (sclass,))
     target.addChildTargetFn(create_reference_dict, (sclass,))
@@ -217,7 +239,7 @@ def create_reference_index(target, sclass):
     Uses Samtools to create reference index file (.fasta.fai)
     """
     # Retrieve reference & store in FileStoreID
-    ref_path = sclass.unavoidable_download_method(target,'ref.fasta')
+    ref_path = sclass.unavoidable_download_method(target, 'ref.fasta')
 
     # Tool call
     command = 'samtools faidx {}'.format(sclass.docker_path(ref_path))
@@ -225,6 +247,7 @@ def create_reference_index(target, sclass):
 
     # Update FileStoreID of output
     target.updateGlobalFile(sclass.ids['ref.fai'], ref_path + '.fai')
+    sclass.StoredSet.add('ref.fai')
 
 
 def create_reference_dict(target, sclass):
@@ -241,6 +264,7 @@ def create_reference_dict(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['ref.dict'], os.path.splitext(ref_path)[0] + '.dict')
+    sclass.StoredSet.add('ref.dict')
 
 
 def create_normal_index(target, sclass):
@@ -253,6 +277,7 @@ def create_normal_index(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['normal.bai'], normal_path + '.bai')
+    sclass.StoredSet.add('normal.bai')
 
 
 def create_tumor_index(target, sclass):
@@ -265,24 +290,26 @@ def create_tumor_index(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['tumor.bai'], tumor_path + '.bai')
+    sclass.StoredSet.add('tumor.bai')
 
 
 def mutect(target, sclass):
-    # Retrieve necessary files
+    # Retrieve inputs that are not in FileStore
     mutect_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'mutect.jar'))
     dbsnp_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'dbsnp.vcf'))
     cosmic_path = sclass.docker_path(sclass.unavoidable_download_method(target, 'cosmic.vcf'))
 
-    # TODO: group files that hae been downloaded (dict? tuple?) and loop over read_rename
+    # TODO: Figure out how to refactor... the renaming convention makes it difficult.
+    # TODO: Otherwise, I would just iterate over the sclass.StoredSet() object.
     normal_bam = sclass.read_and_rename_global_file(target, sclass.ids['normal.bam'], '.bam')
-    normal_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['normal.bai'], '.bai', normal_bam))
     tumor_bam = sclass.read_and_rename_global_file(target, sclass.ids['tumor.bam'], '.bam')
-    tumor_bai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['tumor.bai'], '.bai', tumor_bam))
     ref_fasta = sclass.read_and_rename_global_file(target, sclass.ids['ref.fasta'], '.fasta')
-    ref_fai = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.fai'], '.fasta.fai', ref_fasta))
-    ref_dict = sclass.docker_path(sclass.read_and_rename_global_file(target, sclass.ids['ref.dict'], '.dict', ref_fasta))
+    sclass.read_and_rename_global_file(target, sclass.ids['normal.bai'], '.bai', normal_bam)
+    sclass.read_and_rename_global_file(target, sclass.ids['tumor.bai'], '.bai', tumor_bam)
+    sclass.read_and_rename_global_file(target, sclass.ids['ref.fai'], '.fasta.fai', ref_fasta)
+    sclass.read_and_rename_global_file(target, sclass.ids['ref.dict'], '.dict', ref_fasta)
 
-    # TODO: Fix read_and_rename... to avoid having to recast vars
+    # TODO: Fix this... having to recast these variables is clunky.
     normal_bam = sclass.docker_path(normal_bam)
     tumor_bam = sclass.docker_path(tumor_bam)
     ref_fasta = sclass.docker_path(ref_fasta)
@@ -327,7 +354,9 @@ def main():
     parser = build_parser()
     Stack.addJobTreeOptions(parser)
     args = parser.parse_args()
+    print type(args)
 
+    # URLs to rerieve initial input files
     input_urls = {'ref.fasta': args.reference,
                   'normal.bam': args.normal,
                   'tumor.bam': args.tumor,
