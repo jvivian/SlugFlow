@@ -77,8 +77,8 @@ class SupportClass(object):
                       'mutect': 'jvivian/mutect:1.1.7'}
 
         # TODO: Should this be a jobTree method of target? "Given a key, tell me if a file is linked to it"
-        # Set of symbolic_inputs that have a FileStoreID linked to a file
-        self.StoredSet = set()
+        # Set of symbolic_inputs that have a FileStoreID linked to a file -- removed as not useful.
+        # self.StoredSet = set()
 
     def unavoidable_download_method(self, name):
         """
@@ -107,7 +107,6 @@ class SupportClass(object):
 
         # Update FileStoreID
         self.target.updateGlobalFile(self.ids[name], file_path)
-        self.StoredSet.add(name)
 
         return file_path
 
@@ -247,7 +246,6 @@ def create_reference_index(target, sclass):
 
     # Update FileStoreID of output
     target.updateGlobalFile(sclass.ids['ref.fai'], ref_path + '.fai')
-    sclass.StoredSet.add('ref.fai')
 
 
 def create_reference_dict(target, sclass):
@@ -264,7 +262,6 @@ def create_reference_dict(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['ref.dict'], os.path.splitext(ref_path)[0] + '.dict')
-    sclass.StoredSet.add('ref.dict')
 
 
 def create_normal_index(target, sclass):
@@ -277,7 +274,6 @@ def create_normal_index(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['normal.bai'], normal_path + '.bai')
-    sclass.StoredSet.add('normal.bai')
 
 
 def create_tumor_index(target, sclass):
@@ -290,7 +286,6 @@ def create_tumor_index(target, sclass):
 
     # Update FileStoreID
     target.updateGlobalFile(sclass.ids['tumor.bai'], tumor_path + '.bai')
-    sclass.StoredSet.add('tumor.bai')
 
 
 def mutect(target, sclass):
