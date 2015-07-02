@@ -4,9 +4,6 @@
 """
 Pipeline for Tumor/Normal Variant Calling
 
-    Get Docker
-        |
-        v
     Pull Tool Images
         |
         v
@@ -25,10 +22,9 @@ import shutil
 import subprocess
 import uuid
 import errno
-import sys
 
-from jobTree.src.stack import Stack
-from jobTree.src.target import Target
+from jobTree.stack import Stack
+from jobTree.target import Target
 
 
 def build_parser():
@@ -127,7 +123,6 @@ class SupportClass(object):
         except OSError:
             raise RuntimeError('docker not found on system. Install on all nodes.')
 
-    # TODO: Ask Hannes about @staticmethod as well as _, __ method convention.
     @staticmethod
     def docker_path(filepath):
         return os.path.join('/data', os.path.basename(filepath))
@@ -162,70 +157,9 @@ class SupportClass(object):
             else:
                 raise
 
-    @staticmethod
-    def which(program):
-        """
-        The equivalant in bash of: which
-        http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-        """
-        import os
 
-        def is_exe(fpath):
-            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-        fpath, fname = os.path.split(program)
-        if fpath:
-            if is_exe(program):
-                return program
-        else:
-            for path in os.environ["PATH"].split(os.pathsep):
-                path = path.strip('"')
-                exe_file = os.path.join(path, program)
-                if is_exe(exe_file):
-                    return exe_file
-
-        return None
-
-
-# TODO: Ask Hannes about installation of software on distributed nodes.
-# This function could be considered unnecessary if it's the user's responsibility to install dependency software
-def check_for_docker(target, args, input_urls):
-    """
-    Checks if Docker is present on system -- installs on linux if not present.
-    """
-    # Since this is the start node, instantiate support class instance to distribute to all other targets.
+def start_node(target, args, input_urls):
     sclass = SupportClass(target, args, input_urls)
-
-    if not sclass.which('docker'):
-
-        # TODO: Ask Hannes about making subprocess calls with sudo.
-        if 'linux' in sys.platform:
-            subprocess.check_call(['sudo', 'apt-get', 'update'])
-            subprocess.check_call(['sudo', 'apt-get', 'install', 'linux-image-generic-lts-trusty'])
-
-            if not sclass.which('wget'):
-                try:
-                    subprocess.check_call(['sudo', 'apt-get', 'install', 'wget'])
-                except subprocess.CalledProcessError:
-                    raise RuntimeError('Could not install wget, which is required to install Docker')
-                except OSError:
-                    raise RuntimeError('Could not find apt-get! This OS should (apt) get with the program.')
-
-            try:
-                subprocess.check_call(['wget', '-qO-', 'https://get.docker.com/', '|', 'sh'])
-            except subprocess.CalledProcessError:
-                raise RuntimeError('Failed to install docker on system: https://docs.docker.com/installation/')
-
-            assert sclass.which('docker')
-
-        elif 'darwin' in sys.platform:
-            raise RuntimeError('Docker not installed! Install on Mac here: https://docs.docker.com/installation/mac/')
-
-        elif 'win' in sys.platform:
-            raise RuntimeError('Docker not installed! Install on Windows: https://docs.docker.com/installation/windows')
-
-        else:
-            raise RuntimeError('Docker not installed. Check if available: https://docs.docker.com/installation/')
 
     target.addChildTargetFn(create_reference_index, (sclass,))
     target.addChildTargetFn(create_reference_dict, (sclass,))
@@ -332,7 +266,7 @@ def mutect(target, sclass):
                                   tumor_bam, mut_out, mut_cov, output)
     sclass.docker_call(command, tool_name='mutect')
 
-    # Update FileStoreID TODO: Once AWS is implemented this would upload final result to S3?
+    # Update FileStoreID
     target.updateGlobalFile(sclass.ids['mutect.vcf'],
                             os.path.join(sclass.work_dir, '{}-normal:{}-tumor.vcf'.format(normal_uuid, tumor_uuid)))
 
@@ -345,12 +279,11 @@ def teardown(target, sclass):
         os.remove(f)
 
 
-def main():
+if __name__ == '__main__':
     # Handle parser logic
     parser = build_parser()
     Stack.addJobTreeOptions(parser)
     args = parser.parse_args()
-    # TODO: Ask Hannes the easiest way to obtain "special type" i.e. target instance, args, etc...
 
     # URLs to rerieve initial input files
     input_urls = {'ref.fasta': args.reference,
@@ -367,9 +300,4 @@ def main():
             UUID.normal.bam or UUID.tumor.bam'.format(str(bam).split('.')[1]))
 
     # Create JobTree Stack which launches the jobs starting at the "Start Node"
-    i = Stack(Target.makeTargetFn(check_for_docker, (args, input_urls))).startJobTree(args)
-
-
-if __name__ == '__main__':
-    # from jobtree_docker_pipeline import *
-    main()
+    i = Stack(Target.wrapTargetFn(start_node, args, input_urls)).startJobTree(args)
